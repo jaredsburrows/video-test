@@ -1,0 +1,94 @@
+name: Video Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [ opened, labeled, unlabeled, synchronize ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  build:
+    name: Test Download
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Project
+      uses: actions/checkout@v4.1.7
+
+    - name: Setup Python
+      uses: actions/setup-python@v5.1.1
+      with:
+        python-version: '3.x' # Specify the Python version
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4.0.2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install yt-dlp
+      run: |
+        sudo apt update
+        sudo apt install python3-pip -y
+        sudo pip3 install yt-dlp
+
+    - name: Verify yt-dlp installation
+      run: yt-dlp --version
+
+    - name: Install ffmpeg
+      run: |
+        sudo apt-get update
+        sudo apt-get install ffmpeg
+
+    - name: Verify ffmpeg installation
+      run: |
+        ffmpeg -version
+
+    - name: Write cookies from secret to file
+      run: |
+        echo "${{ secrets.YT_COOKIES }}" > cookies.txt
+
+    - name: TEST - download video
+      run: |
+        yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]" --merge-output-format mp4 l3fmHFUFh84 -N 8 --cookies cookies.txt
+
+    - name: Verify Video
+      run: |
+        for file in *.mp4; do echo "File: $file"; ffprobe -v error -show_format -show_streams "$file" | egrep -i 'codec|width|height|color'; echo ""; done
+
+    - name: Upload MP4
+      uses: actions/upload-artifact@v4.3.5
+      with:
+        name: download.mp4
+        path: |
+          **/*.mp4
+
+
+
+#      - name: Upload Reports
+#        if: github.repository == 'jaredsburrows/android-gif-search' && github.ref == 'refs/heads/master'
+#        uses: actions/upload-artifact@v4.3.5
+#        with:
+#          name: com.burrowsapps.gif.search-reports-${{ github.workflow }}-${{ github.run_id }}
+#          path: |
+#            app/build/reports
+#            app/build/test-results
+#            app/build/outputs/androidTest-results
+#
+#      - name: Upload Debug APK artifact
+#        if: github.repository == 'jaredsburrows/android-gif-search' && github.ref == 'refs/heads/master'
+#        uses: actions/upload-artifact@v4.3.5
+#        with:
+#          name: com.burrowsapps.gif.search-debug-${{ github.workflow }}-${{ github.run_id }}.apk
+#          path: app/build/outputs/apk/debug/app-debug.apk
+#
+#      - name: Upload Release APK artifact
+#        if: github.repository == 'jaredsburrows/android-gif-search' && github.ref == 'refs/heads/master'
+#        uses: actions/upload-artifact@v4.3.5
+#        with:
+#          name: com.burrowsapps.gif.search-release-${{ github.workflow }}-${{ github.run_id }}.apk
+#          path: app/build/outputs/apk/release/app-release.apk
