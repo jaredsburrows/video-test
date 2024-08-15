@@ -1,0 +1,94 @@
+name: Download Youtube Video
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [ opened, labeled, unlabeled, synchronize ]
+  workflow_dispatch: # Allows manual triggering
+    inputs:
+      youtubeId:
+        description: 'YouTube Video ID (https://www.youtube.com/watch?v=ID)'
+        required: true # https://www.youtube.com/watch?v=PSBf1gW1XfE - Meet The Cigar Guys | The Cigar Guys Podcast (Episode 1)
+
+jobs:
+  download:
+    name: YouTube Video
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Project
+      uses: actions/checkout@v4.1.7
+
+    - name: Setup Python
+      uses: actions/setup-python@v5.1.1
+      with:
+        python-version: '3.x' # Specify the Python version
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4.0.2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install yt-dlp
+      run: |
+        sudo apt update
+        sudo apt install python3-pip -y
+        sudo pip3 install yt-dlp
+
+    - name: Verify yt-dlp installation
+      run: yt-dlp --version
+
+    - name: Install ffmpeg
+      run: |
+        sudo apt-get update
+        sudo apt-get install ffmpeg
+
+    - name: Verify ffmpeg installation
+      run: |
+        ffmpeg -version
+
+    - name: Set Default YouTube ID if not provided
+      run: |
+        if [ -z "${{ github.event.inputs.youtubeId }}" ]; then
+          echo "youtubeId=bWF2VdE4FXQ" >> $GITHUB_ENV
+        else
+          echo "youtubeId=${{ github.event.inputs.youtubeId }}" >> $GITHUB_ENV
+        fi
+
+    - name: Write cookies from secret to file
+      run: |
+        echo "${{ secrets.YT_COOKIES }}" > cookies.txt
+
+    - name: Download Video - ${{ env.youtubeId }}
+      run: |
+        yt_dlp_url="https://www.youtube.com/watch?v=${{ env.youtubeId }}"
+        yt-dlp --user-agent "Mozilla/5.0" -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v h264 -c:a aac -threads 8 -progress pipe:1" "$yt_dlp_url" -N 8 --cookies cookies.txt
+        # yt-dlp --user-agent "Mozilla/5.0" -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]" --merge-output-format mp4 --postprocessor-args "ffmpeg:-c:v h264 -c:a aac -threads 8 -progress pipe:1" "https://www.youtube.com/watch?v=PSBf1gW1XfE" -N 8 --cookies cookies.txt
+
+    - name: List Files After Download
+      run: |
+        echo "Listing files in the current directory:"
+        ls -la
+
+    - name: Capture Video Filename - ${{ env.youtubeId }}
+      run: |
+        FILENAME=$(ls *.mp4)
+        echo "Detected filename: $FILENAME"
+        echo "filename=$FILENAME" >> $GITHUB_ENV
+
+    - name: Verify Video - ${{ env.filename }}
+      run: |
+        echo "Verifying file: ${{ env.filename }}"
+        for file in *.mp4; do echo "File: $file"; ffprobe -v error -show_format -show_streams "$file" | egrep -i 'codec|width|height|color'; echo ""; done
+
+    - name: Upload MP4 - ${{ env.filename }}
+      uses: actions/upload-artifact@v4.3.5
+      with:
+        name: ${{ env.filename }}
+        path: |
+          **/*.mp4
