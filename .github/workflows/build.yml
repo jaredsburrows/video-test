@@ -54,7 +54,8 @@ jobs:
 
     - name: TEST - download video
       run: |
-        yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]" --merge-output-format mp4 l3fmHFUFh84 -N 8 --cookies cookies.txt
+        yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]" --merge-output-format mp4
+--postprocessor-args "-c:v h264 -c:a aac -threads 8 -progress pipe:1" l3fmHFUFh84N -N 8 --cookies cookies.txt
 
     - name: Verify Video
       run: |
