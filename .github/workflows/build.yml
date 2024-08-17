@@ -90,7 +90,7 @@ jobs:
         for file in *.mp4; do echo "File: $file"; ffprobe -v error -show_format -show_streams "$file" | egrep -i 'codec|width|height|color'; echo ""; done
 
     - name: Upload MP4 - ${{ env.filename }}
-      uses: actions/upload-artifact@v4.3.5
+      uses: actions/upload-artifact@v4.3.6
       with:
         name: ${{ env.filename }}
         path: |
